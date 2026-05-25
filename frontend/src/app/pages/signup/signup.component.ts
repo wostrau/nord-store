@@ -25,7 +25,9 @@ import { AuthService } from '../../core/auth.service';
         @if (errorMessage) {
           <p class="form-error">{{ errorMessage }}</p>
         }
-        <button class="btn" type="submit" [disabled]="form.invalid">Signup</button>
+        <button class="btn" type="submit" [disabled]="form.invalid || isSubmitting">
+          {{ isSubmitting ? 'Signing up...' : 'Signup' }}
+        </button>
         <a class="form-link" routerLink="/login">Use existing account</a>
       </form>
     </main>
@@ -36,6 +38,7 @@ export class SignupComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
   errorMessage = '';
+  isSubmitting = false;
   readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
@@ -43,12 +46,18 @@ export class SignupComponent {
   });
 
   submit(): void {
+    if (this.form.invalid || this.isSubmitting) {
+      return;
+    }
+
     this.errorMessage = '';
+    this.isSubmitting = true;
     const value = this.form.getRawValue();
     this.authService.signup(value.email, value.password, value.confirmPassword).subscribe({
       next: () => void this.router.navigate(['/']),
       error: (error) => {
         this.errorMessage = error.error?.message ?? 'Signup failed.';
+        this.isSubmitting = false;
       }
     });
   }

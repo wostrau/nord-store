@@ -1,22 +1,14 @@
+import type { Product as ProductResponse, ProductInput } from '@shared/types';
 import { isValidObjectId, Types } from 'mongoose';
 
 import { Product, type ProductDocument } from '../models/product.model.js';
 import { AppError } from '../utils/app-error.js';
 
-export type ProductInput = {
+type ProductInputPayload = {
   title?: string;
   price?: number | string;
   description?: string;
   imageUrl?: string;
-};
-
-export type ProductResponse = {
-  id: string;
-  title: string;
-  price: number;
-  description: string;
-  imageUrl: string;
-  userId?: string;
 };
 
 export const toProductResponse = (product: ProductDocument | any): ProductResponse => ({
@@ -28,7 +20,7 @@ export const toProductResponse = (product: ProductDocument | any): ProductRespon
   userId: product.userId?.toString()
 });
 
-const normalizeProductInput = (input: ProductInput): Required<ProductInput> => {
+const normalizeProductInput = (input: ProductInputPayload): ProductInput => {
   const title = input.title?.trim();
   const description = input.description?.trim();
   const imageUrl = input.imageUrl?.trim();
@@ -69,7 +61,7 @@ export const getProduct = async (productId: string | undefined): Promise<Product
 };
 
 export const createProduct = async (
-  input: ProductInput,
+  input: ProductInputPayload,
   userId: string
 ): Promise<ProductResponse> => {
   const product = await Product.create({
@@ -82,7 +74,7 @@ export const createProduct = async (
 
 export const updateProduct = async (
   productId: string | undefined,
-  input: ProductInput
+  input: ProductInputPayload
 ): Promise<ProductResponse> => {
   const product = await Product.findByIdAndUpdate(
     assertProductId(productId),

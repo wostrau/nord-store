@@ -2,10 +2,10 @@ import { AsyncPipe } from '@angular/common';
 import { Component, inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import type { Product } from '@shared/types';
 import { Observable, of } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 
-import type { Product } from '../../core/api.types';
 import { ProductsService } from '../../core/products.service';
 
 @Component({

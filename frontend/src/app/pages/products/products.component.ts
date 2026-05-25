@@ -1,9 +1,9 @@
 import { AsyncPipe, CurrencyPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import type { Product } from '@shared/types';
 import { Observable } from 'rxjs';
 
-import type { Product } from '../../core/api.types';
 import { AuthService } from '../../core/auth.service';
 import { CartService } from '../../core/cart.service';
 import { ProductsService } from '../../core/products.service';

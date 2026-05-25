@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import type { Order } from '@shared/types';
 
 import { API_URL } from './api-url';
-import type { Order } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class OrdersService {

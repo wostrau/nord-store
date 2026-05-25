@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import type { CartItem } from '@shared/types';
 
 import { API_URL } from './api-url';
-import type { CartItem } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class CartService {

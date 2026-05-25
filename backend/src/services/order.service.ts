@@ -1,25 +1,9 @@
+import type { Order as OrderResponse } from '@shared/types';
+
 import { Order, type OrderDocument } from '../models/order.model.js';
 import { User } from '../models/user.model.js';
 import { AppError } from '../utils/app-error.js';
 import { toProductResponse } from './product.service.js';
-
-export type OrderResponse = {
-  id: string;
-  products: {
-    product: {
-      id: string;
-      title: string;
-      price: number;
-      description: string;
-      imageUrl: string;
-    };
-    quantity: number;
-  }[];
-  user: {
-    email: string;
-    userId: string;
-  };
-};
 
 export const toOrderResponse = (order: OrderDocument): OrderResponse => ({
   id: order.id,

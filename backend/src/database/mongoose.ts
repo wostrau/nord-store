@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-import { env } from './env.js';
+import { env } from '../config/env.js';
 import { AppError } from '../utils/app-error.js';
 
 const readyStateLabels = {

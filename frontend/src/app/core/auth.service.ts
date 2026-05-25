@@ -1,9 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import type { AuthResponse, User } from '@shared/types';
 import { BehaviorSubject, tap } from 'rxjs';
 
 import { API_URL } from './api-url';
-import type { AuthResponse, User } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
