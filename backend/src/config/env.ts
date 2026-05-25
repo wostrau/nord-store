@@ -19,5 +19,7 @@ const parsePort = (value: string | undefined): number => {
 export const env = {
   port: parsePort(process.env.PORT),
   nodeEnv: process.env.NODE_ENV ?? 'development',
-  mongodbUri: process.env.MONGODB_URI
+  mongodbUri: process.env.MONGODB_URI,
+  jwtSecret: process.env.JWT_SECRET ?? 'development-only-change-me',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d'
 };
