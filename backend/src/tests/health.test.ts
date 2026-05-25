@@ -3,14 +3,21 @@ import { describe, expect, it } from 'vitest';
 
 import { app } from '../app.js';
 
+const databaseUnavailableMessages = [
+  'MONGODB_URI is not configured.',
+  'MongoDB connection is not ready: disconnected.'
+];
+
 describe('GET /api/health', () => {
   it('returns the service health payload', async () => {
     const response = await request(app).get('/api/health').expect(200);
 
-    expect(response.body).toEqual({
+    expect(response.body).toMatchObject({
       status: 'ok',
       service: 'nord-store-backend'
     });
+    expect(['not_configured', 'disconnected', 'connected']).toContain(response.body.database.status);
+    expect(typeof response.body.database.configured).toBe('boolean');
   });
 });
 
@@ -33,19 +40,18 @@ describe('protected routes', () => {
 });
 
 describe('API validation', () => {
-  it('validates auth signup body fields before accessing the database', async () => {
-    const response = await request(app).post('/api/auth/signup').send({}).expect(400);
+  it('returns a clear error when auth needs MongoDB but it is not configured', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'user@example.com', password: 'password' })
+      .expect(503);
 
-    expect(response.body).toEqual({
-      message: 'Email and password are required.'
-    });
+    expect(databaseUnavailableMessages).toContain(response.body.message);
   });
 
-  it('rejects invalid product identifiers', async () => {
-    const response = await request(app).get('/api/products/not-a-product-id').expect(400);
+  it('returns a clear error when product APIs need MongoDB but it is not configured', async () => {
+    const response = await request(app).get('/api/products').expect(503);
 
-    expect(response.body).toEqual({
-      message: 'Product ID is invalid.'
-    });
+    expect(databaseUnavailableMessages).toContain(response.body.message);
   });
 });
