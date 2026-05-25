@@ -1,23 +1,23 @@
-export type Product = {
+export interface Product {
   id: string;
   title: string;
   price: number;
   description: string;
   imageUrl: string;
   userId?: string;
-};
+}
 
-export type User = {
+export interface User {
   id: string;
   email: string;
-};
+}
 
-export type CartItem = {
+export interface CartItem {
   product: Product;
   quantity: number;
-};
+}
 
-export type Order = {
+export interface Order {
   id: string;
   products: {
     product: Product;
@@ -27,16 +27,16 @@ export type Order = {
     email: string;
     userId: string;
   };
-};
+}
 
-export type ProductInput = {
+export interface ProductInput {
   title: string;
   imageUrl: string;
   price: number;
   description: string;
-};
+}
 
-export type AuthResponse = {
+export interface AuthResponse {
   token: string;
   user: User;
-};
+}

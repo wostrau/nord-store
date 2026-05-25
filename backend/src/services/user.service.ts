@@ -1,9 +1,6 @@
-import type { UserDocument } from '../models/user.model.js';
+import type { User as UserResponse } from '@shared/types';
 
-export type UserResponse = {
-  id: string;
-  email: string;
-};
+import type { UserDocument } from '../models/user.model.js';
 
 export const toUserResponse = (user: UserDocument): UserResponse => ({
   id: user.id,

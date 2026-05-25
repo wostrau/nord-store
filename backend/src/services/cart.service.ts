@@ -1,14 +1,10 @@
+import type { CartItem as CartItemResponse } from '@shared/types';
 import { isValidObjectId, Types } from 'mongoose';
 
 import { Product } from '../models/product.model.js';
 import { User } from '../models/user.model.js';
 import { AppError } from '../utils/app-error.js';
-import { toProductResponse, type ProductResponse } from './product.service.js';
-
-export type CartItemResponse = {
-  product: ProductResponse;
-  quantity: number;
-};
+import { toProductResponse } from './product.service.js';
 
 const assertObjectId = (id: string | undefined, label: string): string => {
   if (!id || !isValidObjectId(id)) {

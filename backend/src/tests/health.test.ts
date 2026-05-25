@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { app } from '../app.js';
+import { RoutePath } from '../routes/route-paths.js';
 
 const databaseUnavailableMessages = [
   'MONGODB_URI is not configured.',
@@ -10,7 +11,7 @@ const databaseUnavailableMessages = [
 
 describe('GET /api/health', () => {
   it('returns the service health payload', async () => {
-    const response = await request(app).get('/api/health').expect(200);
+    const response = await request(app).get(RoutePath.api.health).expect(200);
 
     expect(response.body).toMatchObject({
       status: 'ok',
@@ -23,7 +24,7 @@ describe('GET /api/health', () => {
 
 describe('protected routes', () => {
   it('requires a bearer token for the cart API', async () => {
-    const response = await request(app).get('/api/cart').expect(401);
+    const response = await request(app).get(RoutePath.api.cart).expect(401);
 
     expect(response.body).toEqual({
       message: 'Authentication token is required.'
@@ -31,7 +32,9 @@ describe('protected routes', () => {
   });
 
   it('requires a bearer token for admin product writes', async () => {
-    const response = await request(app).post('/api/admin/products').expect(401);
+    const response = await request(app)
+      .post(`${RoutePath.api.admin}${RoutePath.admin.products}`)
+      .expect(401);
 
     expect(response.body).toEqual({
       message: 'Authentication token is required.'
@@ -42,7 +45,7 @@ describe('protected routes', () => {
 describe('API validation', () => {
   it('returns a clear error when auth needs MongoDB but it is not configured', async () => {
     const response = await request(app)
-      .post('/api/auth/login')
+      .post(`${RoutePath.api.auth}${RoutePath.auth.login}`)
       .send({ email: 'user@example.com', password: 'password' })
       .expect(503);
 
@@ -50,7 +53,7 @@ describe('API validation', () => {
   });
 
   it('returns a clear error when product APIs need MongoDB but it is not configured', async () => {
-    const response = await request(app).get('/api/products').expect(503);
+    const response = await request(app).get(RoutePath.api.products).expect(503);
 
     expect(databaseUnavailableMessages).toContain(response.body.message);
   });

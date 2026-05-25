@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 
-import { assertDatabaseReady } from '../config/database.js';
+import { assertDatabaseReady } from '../database/mongoose.js';
 
 export const requireDatabase: RequestHandler = (_req, _res, next) => {
   try {
