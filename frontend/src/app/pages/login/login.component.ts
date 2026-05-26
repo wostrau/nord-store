@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { AuthService } from '../../core/auth.service';
 
@@ -18,11 +19,11 @@ import { AuthService } from '../../core/auth.service';
           <label for="password">Password</label>
           <input id="password" type="password" formControlName="password">
         </div>
-        @if (errorMessage) {
-          <p class="form-error">{{ errorMessage }}</p>
+        @if (errorMessage()) {
+          <p class="form-error">{{ errorMessage() }}</p>
         }
-        <button class="btn" type="submit" [disabled]="form.invalid || isSubmitting">
-          {{ isSubmitting ? 'Logging in...' : 'Login' }}
+        <button class="btn" type="submit" [disabled]="form.invalid || isSubmitting()">
+          {{ isSubmitting() ? 'Logging in...' : 'Login' }}
         </button>
         <a class="form-link" routerLink="/signup">Create account</a>
       </form>
@@ -33,25 +34,28 @@ export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
-  errorMessage = '';
-  isSubmitting = false;
+  readonly errorMessage = signal('');
+  readonly isSubmitting = signal(false);
   readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required]
   });
 
   submit(): void {
-    if (this.form.invalid || this.isSubmitting) {
+    if (this.form.invalid || this.isSubmitting()) {
       return;
     }
 
-    this.errorMessage = '';
-    this.isSubmitting = true;
-    this.authService.login(this.form.value.email ?? '', this.form.value.password ?? '').subscribe({
+    this.errorMessage.set('');
+    this.isSubmitting.set(true);
+    const value = this.form.getRawValue();
+
+    this.authService.login(value.email, value.password).pipe(
+      finalize(() => this.isSubmitting.set(false))
+    ).subscribe({
       next: () => void this.router.navigate(['/']),
       error: (error) => {
-        this.errorMessage = error.error?.message ?? 'Login failed.';
-        this.isSubmitting = false;
+        this.errorMessage.set(error.error?.message ?? 'Login failed.');
       }
     });
   }
