@@ -932,6 +932,131 @@
   }
   ```
 
+  Важный момент для functional components: в стабильном React error boundary по-прежнему реализуется через class component, потому что API завязан на `static getDerivedStateFromError` и `componentDidCatch`. Hook вроде `useErrorBoundary` в самом React для создания boundary пока не является стандартной заменой этим lifecycle methods.
+
+  Но это не мешает работать с functional components: обычно class-based `ErrorBoundary` просто оборачивает subtree, внутри которого могут быть любые function components.
+
+  ```tsx
+  function ProductPage() {
+    return (
+      <ErrorBoundary>
+        <ProductDetails />
+        <Recommendations />
+      </ErrorBoundary>
+    );
+  }
+  ```
+
+  Если `ProductDetails` или `Recommendations` выбросят ошибку во время render, React покажет fallback из `ErrorBoundary`, а не сломает весь UI.
+
+  На практике часто делают reusable boundary с props:
+
+  ```tsx
+  type ErrorBoundaryProps = {
+    fallback: React.ReactNode;
+    children: React.ReactNode;
+  };
+
+  type ErrorBoundaryState = {
+    hasError: boolean;
+  };
+
+  class ErrorBoundary extends React.Component<
+    ErrorBoundaryProps,
+    ErrorBoundaryState
+  > {
+    state: ErrorBoundaryState = { hasError: false };
+
+    static getDerivedStateFromError(): ErrorBoundaryState {
+      return { hasError: true };
+    }
+
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+      reportError(error, info.componentStack);
+    }
+
+    render() {
+      if (this.state.hasError) {
+        return this.props.fallback;
+      }
+
+      return this.props.children;
+    }
+  }
+  ```
+
+  Использование:
+
+  ```tsx
+  <ErrorBoundary fallback={<p>Не удалось загрузить товар.</p>}>
+    <ProductDetails />
+  </ErrorBoundary>
+  ```
+
+  Если хочется работать в более "function-style" API, часто используют библиотеку `react-error-boundary`. Она предоставляет готовый class boundary под капотом, но API выглядит удобно для functional components:
+
+  ```tsx
+  import { ErrorBoundary } from 'react-error-boundary';
+
+  function ProductErrorFallback({ error, resetErrorBoundary }) {
+    return (
+      <div role="alert">
+        <p>Не удалось загрузить товар.</p>
+        <pre>{error.message}</pre>
+        <button onClick={resetErrorBoundary}>Попробовать снова</button>
+      </div>
+    );
+  }
+
+  function ProductPage({ productId }: { productId: string }) {
+    return (
+      <ErrorBoundary
+        FallbackComponent={ProductErrorFallback}
+        resetKeys={[productId]}
+      >
+        <ProductDetails productId={productId} />
+      </ErrorBoundary>
+    );
+  }
+  ```
+
+  Что error boundary ловит:
+
+  - ошибки во время render child components;
+  - ошибки в lifecycle methods child class components;
+  - ошибки в constructors child class components.
+
+  Что error boundary не ловит:
+
+  - ошибки внутри event handlers;
+  - ошибки в async callbacks: `setTimeout`, `Promise`, `fetch`;
+  - ошибки на server-side rendering;
+  - ошибки внутри самого error boundary.
+
+  Для event handlers нужен обычный `try/catch` или перевод ошибки в state:
+
+  ```tsx
+  function SaveButton() {
+    const [error, setError] = useState<Error | null>(null);
+
+    async function handleClick() {
+      try {
+        await saveProduct();
+      } catch (error) {
+        setError(error as Error);
+      }
+    }
+
+    if (error) {
+      return <p>Save failed: {error.message}</p>;
+    }
+
+    return <button onClick={handleClick}>Save</button>;
+  }
+  ```
+
+  Практическая рекомендация: ставить error boundaries на границах крупных UI-зон: route/page, widget, sidebar, product details, recommendations. Не нужно оборачивать каждый маленький компонент. Boundary должен изолировать поломку части интерфейса и дать пользователю понятный fallback.
+
   **Legacy unsafe methods**
 
   `UNSAFE_componentWillMount`, `UNSAFE_componentWillReceiveProps`, `UNSAFE_componentWillUpdate` — старые lifecycle methods. Их не рекомендуют использовать, потому что они плохо совместимы с async/concurrent rendering. В legacy code они могут встречаться, но новый код лучше писать через безопасные lifecycle methods или function components с hooks.
@@ -1098,11 +1223,161 @@
 
 - What are Render Props?
 
-  **Ответ:** Render prop — prop-функция, через которую компонент отдает данные/поведение наружу, а caller решает, какой UI отрисовать.
+  **Ответ:** Render prop — это паттерн, где компонент принимает функцию-prop и вызывает ее, чтобы caller сам решил, какой UI отрисовать. Компонент с render prop обычно отвечает за behavior/state, а внешний код отвечает за presentation.
 
   ```tsx
   <MouseTracker render={({ x, y }) => <Tooltip x={x} y={y} />} />
   ```
+
+  Идея:
+
+  ```txt
+  Component owns logic/state
+          ↓
+  calls render function with data
+          ↓
+  caller returns JSX
+  ```
+
+  Пример: компонент отслеживает позицию мыши, но не знает, как именно ее показать.
+
+  ```tsx
+  type MousePosition = {
+    x: number;
+    y: number;
+  };
+
+  function MouseTracker({
+    render,
+  }: {
+    render: (position: MousePosition) => React.ReactNode;
+  }) {
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+
+    function handleMouseMove(event: React.MouseEvent) {
+      setPosition({ x: event.clientX, y: event.clientY });
+    }
+
+    return (
+      <div onMouseMove={handleMouseMove}>
+        {render(position)}
+      </div>
+    );
+  }
+  ```
+
+  Использование:
+
+  ```tsx
+  <MouseTracker
+    render={({ x, y }) => (
+      <p>
+        Mouse position: {x}, {y}
+      </p>
+    )}
+  />
+  ```
+
+  Тот же behavior можно переиспользовать с другим UI:
+
+  ```tsx
+  <MouseTracker
+    render={({ x, y }) => (
+      <Tooltip style={{ left: x, top: y }}>
+        Cursor is here
+      </Tooltip>
+    )}
+  />
+  ```
+
+  Частые use cases:
+
+  - shared behavior без HOC: mouse position, window size, permissions, feature flags;
+  - data fetching component, где caller решает, как показать loading/error/success;
+  - form field wrappers;
+  - authorization gates;
+  - reusable layout logic;
+  - animation/state machine components.
+
+  Пример data loader:
+
+  ```tsx
+  function ProductLoader({
+    productId,
+    children,
+  }: {
+    productId: string;
+    children: (state: {
+      product: Product | null;
+      isLoading: boolean;
+      error: Error | null;
+    }) => React.ReactNode;
+  }) {
+    const [product, setProduct] = useState<Product | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+      setIsLoading(true);
+      api.getProduct(productId)
+        .then(setProduct)
+        .catch(setError)
+        .finally(() => setIsLoading(false));
+    }, [productId]);
+
+    return children({ product, isLoading, error });
+  }
+  ```
+
+  Использование:
+
+  ```tsx
+  <ProductLoader productId="p1">
+    {({ product, isLoading, error }) => {
+      if (isLoading) return <Spinner />;
+      if (error) return <p>Failed to load product.</p>;
+      if (!product) return null;
+
+      return <ProductDetails product={product} />;
+    }}
+  </ProductLoader>
+  ```
+
+  Render prop не обязательно должен называться `render`. Часто используют `children` как функцию:
+
+  ```tsx
+  <AuthGate>
+    {({ user }) => user ? <Dashboard user={user} /> : <Login />}
+  </AuthGate>
+  ```
+
+  Плюсы:
+
+  - хорошо отделяет logic от presentation;
+  - caller получает полный контроль над JSX;
+  - меньше проблем с prop name collisions, чем в HOC;
+  - удобно типизировать contract между logic component и UI.
+
+  Минусы:
+
+  - может привести к вложенной "пирамиде" render functions;
+  - новая inline function создается на каждый render, что иногда мешает memoization;
+  - после появления hooks многие render props стали менее нужны.
+
+  Сегодня во многих случаях вместо render props пишут custom hook:
+
+  ```tsx
+  function ProductPage({ productId }: { productId: string }) {
+    const { product, isLoading, error } = useProduct(productId);
+
+    if (isLoading) return <Spinner />;
+    if (error) return <p>Failed to load product.</p>;
+
+    return <ProductDetails product={product} />;
+  }
+  ```
+
+  Но render props все еще полезны в библиотеках и компонентах, где нужно дать caller-у полный контроль над разметкой, не заставляя его использовать конкретный hook или структуру UI.
 
 - What are Higher-Order Components (HOCs)?
 
@@ -1123,7 +1398,83 @@
 
 - What is the difference between native DOM event handlers and React event handlers?
 
-  **Ответ:** Native handler назначается через `addEventListener` и получает browser event. React handler задается JSX prop-ом, например `onClick`, и получает SyntheticEvent. React делегирует события, нормализует API и интегрирует event handling с batching/priority.
+  **Ответ:** Native handler назначается напрямую на DOM node через `addEventListener` или DOM property и получает настоящий browser `Event`. React handler задается JSX prop-ом, например `onClick`, `onChange`, `onSubmit`, и получает React `SyntheticEvent`.
+
+  Native DOM:
+
+  ```ts
+  const button = document.querySelector('button');
+
+  button?.addEventListener('click', (event) => {
+    console.log(event); // MouseEvent
+  });
+  ```
+
+  React:
+
+  ```tsx
+  function SaveButton() {
+    function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+      console.log(event); // SyntheticEvent wrapper
+    }
+
+    return <button onClick={handleClick}>Save</button>;
+  }
+  ```
+
+  Главные отличия:
+
+  - **Назначение handler-а:** native — через `addEventListener`, React — через JSX prop.
+  - **Имена событий:** native — lowercase strings: `'click'`, `'input'`; React — camelCase props: `onClick`, `onInput`, `onChange`.
+  - **Тип события:** native получает `Event`/`MouseEvent`/`KeyboardEvent`; React получает `SyntheticEvent`.
+  - **Делегирование:** React обычно делегирует события на root container и сам вызывает нужные handlers по React tree.
+  - **Batching:** state updates внутри React event handlers batch-ятся и участвуют в React scheduling/priority.
+  - **Cross-browser normalization:** SyntheticEvent дает более единый API поверх различий браузеров.
+  - **Propagation:** React propagation идет через React tree; для portals это особенно важно.
+
+  `SyntheticEvent` — это обертка над native event. У него похожие методы:
+
+  ```tsx
+  function Form() {
+    function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    return <form onSubmit={handleSubmit} />;
+  }
+  ```
+
+  Если нужен настоящий browser event, он доступен через `event.nativeEvent`:
+
+  ```tsx
+  function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+    const nativeEvent = event.nativeEvent;
+    console.log(nativeEvent instanceof MouseEvent);
+  }
+  ```
+
+  Важный нюанс: в старых версиях React SyntheticEvent использовал pooling, поэтому нельзя было асинхронно читать event без `event.persist()`. В современных React версиях pooling убран, и это обычно не проблема.
+
+  Когда использовать native listener в React:
+
+  - подписка на `window`, `document`, `resize`, `scroll`, `visibilitychange`;
+  - интеграция с non-React library;
+  - события, которые не удобно повесить через JSX;
+  - low-level performance/gesture cases.
+
+  В таких случаях listener добавляют и удаляют в effect:
+
+  ```tsx
+  useEffect(() => {
+    function handleResize() {
+      console.log(window.innerWidth);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  ```
 
 - How can context be lost in JavaScript event handlers?
 
@@ -1191,22 +1542,266 @@
 
 - How can custom forms be implemented in React?
 
-  **Ответ:** Обычно делают state для values/errors/touched/submitting, handlers `onChange`, `onBlur`, `onSubmit`, validation и API submit.
+  **Ответ:** Custom form в React обычно строится как controlled form: React хранит `values`, `errors`, `touched`, `isSubmitting`, а inputs получают `value` и `onChange`. Такой подход дает полный контроль над validation, disabled states, форматированием, server errors и submit flow.
+
+  Минимальные части формы:
+
+  - `values` — текущие значения полей;
+  - `errors` — ошибки validation;
+  - `touched` — поля, с которыми пользователь уже взаимодействовал;
+  - `isSubmitting` — идет ли submit;
+  - `handleChange` — обновляет values;
+  - `handleBlur` — помечает поле touched;
+  - `validate` — проверяет values;
+  - `handleSubmit` — предотвращает default submit, валидирует, вызывает API;
+  - `reset` — возвращает форму в initial state.
 
   ```tsx
   function LoginForm() {
-    const [values, setValues] = useState({ email: '', password: '' });
-    const [error, setError] = useState('');
+    const [values, setValues] = useState({
+      email: '',
+      password: '',
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    async function submit(event: React.FormEvent) {
-      event.preventDefault();
-      if (!values.email) return setError('Email is required');
-      await api.login(values);
+    function validate(nextValues = values) {
+      const nextErrors: Record<string, string> = {};
+
+      if (!nextValues.email) {
+        nextErrors.email = 'Email is required';
+      }
+
+      if (nextValues.password.length < 8) {
+        nextErrors.password = 'Password must be at least 8 characters';
+      }
+
+      return nextErrors;
     }
 
-    return <form onSubmit={submit}>{/* inputs */}</form>;
+    function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+      const { name, value } = event.target;
+
+      setValues((currentValues) => ({
+        ...currentValues,
+        [name]: value,
+      }));
+    }
+
+    function handleBlur(event: React.FocusEvent<HTMLInputElement>) {
+      const { name } = event.target;
+
+      setTouched((currentTouched) => ({
+        ...currentTouched,
+        [name]: true,
+      }));
+    }
+
+    async function handleSubmit(event: React.FormEvent) {
+      event.preventDefault();
+
+      const validationErrors = validate();
+      setErrors(validationErrors);
+      setTouched({ email: true, password: true });
+
+      if (Object.keys(validationErrors).length > 0) {
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+        await api.login(values);
+      } catch (error) {
+        setErrors({
+          form: 'Invalid email or password',
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    return (
+      <form onSubmit={handleSubmit} noValidate>
+        {errors.form ? <p role="alert">{errors.form}</p> : null}
+
+        <label>
+          Email
+          <input
+            name="email"
+            type="email"
+            value={values.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            aria-invalid={Boolean(touched.email && errors.email)}
+          />
+        </label>
+        {touched.email && errors.email ? <p>{errors.email}</p> : null}
+
+        <label>
+          Password
+          <input
+            name="password"
+            type="password"
+            value={values.password}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            aria-invalid={Boolean(touched.password && errors.password)}
+          />
+        </label>
+        {touched.password && errors.password ? <p>{errors.password}</p> : null}
+
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Logging in...' : 'Login'}
+        </button>
+      </form>
+    );
   }
   ```
+
+  Для нескольких полей удобно делать reusable handler через `name`, как в примере выше. Для checkbox/select нужны небольшие отличия:
+
+  ```tsx
+  function handleInputChange(
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
+    const target = event.target;
+    const value =
+      target instanceof HTMLInputElement && target.type === 'checkbox'
+        ? target.checked
+        : target.value;
+
+    setValues((currentValues) => ({
+      ...currentValues,
+      [target.name]: value,
+    }));
+  }
+  ```
+
+  Если форма становится больше, логику часто выносят в custom hook:
+
+  ```tsx
+  function useForm<TValues>({
+    initialValues,
+    validate,
+    onSubmit,
+  }: {
+    initialValues: TValues;
+    validate: (values: TValues) => Partial<Record<keyof TValues, string>>;
+    onSubmit: (values: TValues) => Promise<void>;
+  }) {
+    const [values, setValues] = useState(initialValues);
+    const [errors, setErrors] = useState<Partial<Record<keyof TValues, string>>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    async function handleSubmit(event: React.FormEvent) {
+      event.preventDefault();
+
+      const nextErrors = validate(values);
+      setErrors(nextErrors);
+
+      if (Object.keys(nextErrors).length > 0) {
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+        await onSubmit(values);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    return {
+      values,
+      setValues,
+      errors,
+      isSubmitting,
+      handleSubmit,
+    };
+  }
+  ```
+
+  Реальные нюансы:
+
+  - client validation нужна для UX, но server validation все равно обязательна;
+  - server errors нужно маппить либо в `form` error, либо в field errors;
+  - file inputs обычно uncontrolled, потому что их value нельзя безопасно контролировать;
+  - для больших форм controlled inputs могут давать много renders, поэтому используют React Hook Form, Final Form или оптимизацию по полям;
+  - accessibility важна: `label`, `aria-invalid`, `aria-describedby`, `role="alert"`;
+  - submit button нужно блокировать на время submit, чтобы избежать double submit;
+  - после успешного submit форму можно reset-ить или оставить значения, зависит от сценария.
+
+  Accessibility в формах означает, что форма понятна не только визуально, но и для клавиатуры, screen readers и других assistive technologies. Главное правило: пользователь должен понимать, что это за поле, какая в нем ошибка и как исправить ввод.
+
+  Хороший field pattern:
+
+  ```tsx
+  function EmailField({
+    value,
+    error,
+    onChange,
+    onBlur,
+  }: {
+    value: string;
+    error?: string;
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur: (event: React.FocusEvent<HTMLInputElement>) => void;
+  }) {
+    const inputId = 'email';
+    const errorId = 'email-error';
+
+    return (
+      <div>
+        <label htmlFor={inputId}>Email</label>
+        <input
+          id={inputId}
+          name="email"
+          type="email"
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          autoComplete="email"
+        />
+        {error ? (
+          <p id={errorId} role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+  ```
+
+  Что здесь важно:
+
+  - `label htmlFor` связан с `input id`, поэтому screen reader озвучит название поля;
+  - `aria-invalid` сообщает, что поле сейчас невалидно;
+  - `aria-describedby` связывает input с текстом ошибки;
+  - `role="alert"` просит assistive technology озвучить появившуюся ошибку;
+  - `autoComplete` помогает браузеру и password managers;
+  - настоящий `<button type="submit">` доступнее, чем кликабельный `<div>`.
+
+  Для общей ошибки формы можно использовать отдельный alert:
+
+  ```tsx
+  {errors.form ? (
+    <div role="alert" aria-live="polite">
+      {errors.form}
+    </div>
+  ) : null}
+  ```
+
+  Дополнительные правила:
+
+  - не полагаться только на цвет ошибки, добавлять текст;
+  - сохранять нормальный keyboard flow: Tab, Shift+Tab, Enter;
+  - после неуспешного submit можно переводить focus на первую ошибку или summary ошибок;
+  - disabled button не всегда лучший UX, иногда лучше оставить кнопку активной и объяснить ошибку;
+  - loading state должен быть доступен: текст `Logging in...`, `aria-busy` или status region;
+  - custom select/checkbox/radio нужно делать особенно аккуратно, потому что native элементы уже имеют accessibility из коробки.
 
 - How do Formik and React Final Form work?
 
@@ -1929,3 +2524,127 @@
 - How can third-party hook libraries such as react-use be utilized?
 
   **Ответ:** Такие библиотеки дают готовые hooks для common browser/state patterns: media queries, localStorage, debounce, intervals, clipboard. Их стоит использовать после проверки качества, SSR-safety, bundle size и соответствия project conventions.
+
+- What is the React use() API?
+
+  **Ответ:** `use()` — это публичный React API для чтения значения из resource во время render. Resource сейчас может быть `Promise` или `Context`. API актуален в React 19+: его можно использовать в последних версиях React, но важно понимать ограничения. В документации React `use` описан как API, а не как обычный Hook, хотя вызывается он из компонента или custom hook.
+
+  Сигнатура:
+
+  ```tsx
+  import { use } from 'react';
+
+  const value = use(resource);
+  ```
+
+  Что можно передать в `use(resource)`:
+
+  - `Promise` — React дождется результата через Suspense;
+  - `Context` — React прочитает значение context provider.
+
+  Пример с `Promise`:
+
+  ```tsx
+  import { Suspense, use } from 'react';
+
+  function ProductDetails({
+    productPromise,
+  }: {
+    productPromise: Promise<Product>;
+  }) {
+    const product = use(productPromise);
+
+    return (
+      <article>
+        <h1>{product.title}</h1>
+        <p>{product.description}</p>
+      </article>
+    );
+  }
+
+  function ProductPage({ productPromise }: { productPromise: Promise<Product> }) {
+    return (
+      <Suspense fallback={<p>Loading product...</p>}>
+        <ProductDetails productPromise={productPromise} />
+      </Suspense>
+    );
+  }
+  ```
+
+  Как это работает:
+
+  - если Promise pending, компонент "suspends";
+  - ближайший `<Suspense fallback={...}>` показывает fallback;
+  - когда Promise resolved, React продолжает render с готовым значением;
+  - если Promise rejected, ошибку должен обработать ближайший Error Boundary или `.catch()` на Promise.
+
+  Пример с Error Boundary:
+
+  ```tsx
+  <ErrorBoundary fallback={<p>Failed to load product.</p>}>
+    <Suspense fallback={<p>Loading product...</p>}>
+      <ProductDetails productPromise={productPromise} />
+    </Suspense>
+  </ErrorBoundary>
+  ```
+
+  Пример с context:
+
+  ```tsx
+  import { createContext, use } from 'react';
+
+  const ThemeContext = createContext('light');
+
+  function Button({ showTheme }: { showTheme: boolean }) {
+    if (showTheme) {
+      const theme = use(ThemeContext);
+      return <button className={`button-${theme}`}>Save</button>;
+    }
+
+    return <button>Save</button>;
+  }
+  ```
+
+  Отличие от обычных Hooks: `use()` можно вызывать внутри `if` и циклов. Например `useContext()` должен быть на top level, а `use(ThemeContext)` можно вызвать условно. Но `use()` все равно нельзя вызывать где угодно: он должен вызываться внутри React component или custom hook, не в event handler, не в обычной utility function.
+
+  Ограничения и практические правила:
+
+  - В Server Components для data fetching чаще лучше использовать `async/await`, а не `use()`, потому что `await` продолжает render с места ожидания.
+  - В Client Components лучше не создавать Promise прямо во время render: такой Promise будет пересоздаваться на каждый render. Лучше создать Promise на сервере, в route loader/framework layer или закешировать его.
+  - `use()` нельзя оборачивать обычным `try/catch` для rejected Promise; используйте Error Boundary или `promise.catch(...)`.
+  - Для обычного local state `use()` не нужен: используйте `useState`/`useReducer`.
+  - Для обычного context чаще можно использовать `useContext`, но `use(Context)` полезен, когда context нужно читать условно.
+
+  Пример, чего лучше избегать:
+
+  ```tsx
+  function ProductDetails({ productId }: { productId: string }) {
+    // Плохо: Promise создается заново на каждый render.
+    const product = use(fetch(`/api/products/${productId}`).then((res) => res.json()));
+
+    return <h1>{product.title}</h1>;
+  }
+  ```
+
+  Лучше передать стабильный Promise:
+
+  ```tsx
+  function ProductPage({ productPromise }: { productPromise: Promise<Product> }) {
+    return (
+      <Suspense fallback={<p>Loading...</p>}>
+        <ProductDetails productPromise={productPromise} />
+      </Suspense>
+    );
+  }
+
+  function ProductDetails({
+    productPromise,
+  }: {
+    productPromise: Promise<Product>;
+  }) {
+    const product = use(productPromise);
+    return <h1>{product.title}</h1>;
+  }
+  ```
+
+  Коротко: `use()` актуален в React 19+, это публичный API для чтения Promise/context в render. Он особенно полезен вместе с Suspense, Server Components и streaming data, но это не универсальная замена `useEffect`, `useState`, `useContext` или `async/await`.
