@@ -1,0 +1,146 @@
+- What is the DOM?
+- What is the DOM tree?
+- How can the DOM be inspected in the browser?
+- How is the DOM tree created by the browser?
+- How can DOM elements be navigated programmatically?
+- What is the difference between console.log() and console.dir()?
+- What are Web Components?
+- What is Shadow DOM?
+- What problems does Shadow DOM solve?
+
+- What is the difference between client*, offset*, and scroll* properties?
+- What are clientWidth, clientHeight, offsetWidth, and offsetHeight?
+- What are scrollWidth and scrollHeight?
+- How can an element's bounding rectangle be obtained?
+- Which DOM element properties are writable?
+
+- What is the difference between classList and className?
+- How can CSS classes be manipulated dynamically with JavaScript?
+- How can styles be applied dynamically using JavaScript?
+- What is style.cssText?
+- What are computed styles?
+- How can computed styles be retrieved?
+
+- What are the different ways to select DOM elements?
+- How do CSS selectors work in JavaScript?
+- What is the difference between getElement* methods and querySelector* methods?
+- When should one approach be preferred over the other?
+
+- What are DOM events?
+- How are event listeners added and removed?
+- What are the most common DOM event types?
+- How can default browser behavior be prevented?
+- What are event bubbling and event capturing?
+- How does event propagation work?
+- What is event delegation?
+- Why is event delegation useful?
+- What advanced DOM event types exist?
+- What are form events?
+- What are custom events?
+- How can custom events be created and dispatched?
+- What are document, window, and content load events?
+
+- What are cookies?
+- How are cookies created, read, and updated?
+- What is cookie expiration?
+- What are secure cookies?
+- How can cookies be removed?
+- What are cookie size limitations?
+- What are third-party cookies?
+- What are GDPR requirements regarding cookies?
+
+- What is the difference between localStorage and sessionStorage?
+- What are browser storages used for?
+- How can values be stored, retrieved, and removed?
+- What are storage events?
+- What are the size limitations of browser storage?
+
+- What is IndexedDB?
+- How is IndexedDB initialized and configured?
+- How do transactions work in IndexedDB?
+- How does querying and searching work in IndexedDB?
+- How is database versioning handled?
+- What are IndexedDB cursors?
+- How do cursors work?
+
+- What is minification?
+- What is uglification?
+- Why are minification and uglification used?
+- What is compression in web applications?
+- What is tree shaking?
+- How does tree shaking remove unused code?
+- What causes dependency duplication in npm projects?
+- What is the difference between static and dynamic compression?
+- What is the difference between Gzip and Brotli?
+
+- How does browser caching work?
+- How can static assets be optimized and compressed?
+- What is the difference between async and defer scripts?
+- What is Critical CSS?
+- Why is Critical CSS important?
+- What is lazy loading of code chunks?
+- What is requestAnimationFrame()?
+- Why is requestAnimationFrame() used?
+- What is browser support for requestAnimationFrame()?
+
+- What are Web Workers?
+- Why are Web Workers needed?
+- How are Web Workers created?
+- How are Web Workers terminated?
+- How is communication implemented between the main thread and Web Workers?
+- What are subworkers?
+- How are errors handled in Web Workers?
+- What are Shared Workers?
+- What are Embedded Workers?
+- How does Content Security Policy affect Web Workers?
+
+- What is a Service Worker?
+- How does a Service Worker work?
+- What browser requirements exist for Service Workers?
+- What is the architecture of a Service Worker?
+- What steps are required to register and use a Service Worker?
+- How can outdated caches be removed?
+- What is the difference between Service Workers and AppCache?
+- How can IndexedDB be used together with Service Workers?
+- How is Service Worker versioning managed?
+
+- What is the basic structure of an HTML document?
+- What are HTML entities and symbols?
+- How are text formatting and paragraphs implemented in HTML?
+- How do HTML links work?
+- What is the purpose of the target attribute?
+- How are tables implemented in HTML?
+- How are scripts added to an HTML document?
+- What is the difference between block and inline elements?
+- How are media elements used in HTML?
+- How do HTML forms work?
+- What is SVG?
+- How are meta tags used?
+- What is the purpose of the template element?
+- What is the purpose of the iframe element?
+- What is the purpose of the canvas element?
+- What are HTML style guides and coding conventions?
+- What are common HTML best practices?
+
+- What layout techniques are commonly used in CSS frameworks?
+- How do CSS selectors work?
+- What is CSS specificity?
+- How does CSS positioning work?
+- What is the difference between margin and padding?
+- How are custom fonts added to a webpage?
+- What are the different ways to hide an element?
+- How does z-index work?
+- How does Flexbox work?
+- What problems does Flexbox solve?
+- What is responsive design?
+- How do CSS preprocessors such as SASS and LESS work?
+- What are the differences between SASS and LESS?
+- What are pseudo-elements?
+- What are pseudo-classes?
+- What layout techniques exist besides Flexbox?
+- What is the difference between Float, Flexbox, CSS Grid, and framework-based layouts?
+- How is responsive design implemented in practice?
+- How do CSS animations work?
+- What are keyframes?
+- What are CSS transitions?
+- How are browser-specific styles handled?
