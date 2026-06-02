@@ -49,3 +49,11 @@ export const connectDatabase = async (): Promise<void> => {
   await mongoose.connect(env.mongodbUri);
   console.info('Connected to MongoDB.');
 };
+
+export const disconnectDatabase = async (): Promise<void> => {
+  if (mongoose.connection.readyState === 0) {
+    return;
+  }
+
+  await mongoose.disconnect();
+};

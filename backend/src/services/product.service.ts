@@ -3,6 +3,8 @@ import { isValidObjectId, Types } from 'mongoose';
 
 import { Product, type ProductDocument } from '../models/product.model.js';
 import { AppError } from '../utils/app-error.js';
+import { deleteKeys, getJson, setJson } from './cache.service.js';
+import { productCacheKeys } from './product-cache-keys.js';
 
 type ProductInputPayload = {
   title?: string;
@@ -46,18 +48,38 @@ const assertProductId = (productId: string | undefined): string => {
 };
 
 export const listProducts = async (): Promise<ProductResponse[]> => {
+  const cachedProducts = await getJson<ProductResponse[]>(productCacheKeys.list);
+  if (cachedProducts !== null) {
+    return cachedProducts;
+  }
+
   const products = await Product.find().sort({ createdAt: -1 });
-  return products.map(toProductResponse);
+  const productResponses = products.map(toProductResponse);
+
+  await setJson(productCacheKeys.list, productResponses);
+
+  return productResponses;
 };
 
 export const getProduct = async (productId: string | undefined): Promise<ProductResponse> => {
-  const product = await Product.findById(assertProductId(productId));
+  const validProductId = assertProductId(productId);
+  const cacheKey = productCacheKeys.detail(validProductId);
+  const cachedProduct = await getJson<ProductResponse>(cacheKey);
+  if (cachedProduct !== null) {
+    return cachedProduct;
+  }
+
+  const product = await Product.findById(validProductId);
 
   if (!product) {
     throw new AppError('Product was not found.', 404);
   }
 
-  return toProductResponse(product);
+  const productResponse = toProductResponse(product);
+
+  await setJson(cacheKey, productResponse);
+
+  return productResponse;
 };
 
 export const createProduct = async (
@@ -69,6 +91,8 @@ export const createProduct = async (
     userId: new Types.ObjectId(userId)
   });
 
+  await deleteKeys([productCacheKeys.list]);
+
   return toProductResponse(product);
 };
 
@@ -76,8 +100,9 @@ export const updateProduct = async (
   productId: string | undefined,
   input: ProductInputPayload
 ): Promise<ProductResponse> => {
+  const validProductId = assertProductId(productId);
   const product = await Product.findByIdAndUpdate(
-    assertProductId(productId),
+    validProductId,
     normalizeProductInput(input),
     { new: true, runValidators: true }
   );
@@ -86,13 +111,18 @@ export const updateProduct = async (
     throw new AppError('Product was not found.', 404);
   }
 
+  await deleteKeys([productCacheKeys.list, productCacheKeys.detail(validProductId)]);
+
   return toProductResponse(product);
 };
 
 export const deleteProduct = async (productId: string | undefined): Promise<void> => {
-  const product = await Product.findByIdAndDelete(assertProductId(productId));
+  const validProductId = assertProductId(productId);
+  const product = await Product.findByIdAndDelete(validProductId);
 
   if (!product) {
     throw new AppError('Product was not found.', 404);
   }
+
+  await deleteKeys([productCacheKeys.list, productCacheKeys.detail(validProductId)]);
 };
