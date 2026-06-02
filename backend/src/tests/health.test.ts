@@ -19,6 +19,13 @@ describe('GET /api/health', () => {
     });
     expect(['not_configured', 'disconnected', 'connected']).toContain(response.body.database.status);
     expect(typeof response.body.database.configured).toBe('boolean');
+    expect(response.body.redis).toMatchObject({
+      configured: expect.any(Boolean),
+      ready: expect.any(Boolean)
+    });
+    expect(['not_configured', 'disconnected', 'connected', 'error']).toContain(
+      response.body.redis.status
+    );
   });
 });
 
