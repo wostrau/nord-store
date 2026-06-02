@@ -37,6 +37,31 @@
   }
   ```
 
+  Narrowing через `in` полезен, когда union состоит из объектов с разными полями:
+
+  ```ts
+  type CardPayment = {
+    cardNumber: string;
+    cvv: string;
+  };
+
+  type PaypalPayment = {
+    email: string;
+  };
+
+  type Payment = CardPayment | PaypalPayment;
+
+  function getPaymentLabel(payment: Payment): string {
+    if ('cardNumber' in payment) {
+      return `Card ending with ${payment.cardNumber.slice(-4)}`;
+    }
+
+    return `PayPal account ${payment.email}`;
+  }
+  ```
+
+  Внутри блока `if ('cardNumber' in payment)` TypeScript понимает, что `payment` — это `CardPayment`. В `else` остается второй вариант union — `PaypalPayment`.
+
 - What are literal types?
 
   **Ответ:** Literal type ограничивает значение конкретным литералом: строкой, числом или boolean. Они часто используются вместе с union types для описания допустимых состояний, ролей или вариантов API.
@@ -60,6 +85,21 @@
 
   **Ответ:** Generics позволяют писать reusable код, который сохраняет информацию о типах. Вместо `any` generic type parameter связывает входы и выходы функции, класса или interface, сохраняя type safety.
 
+  Проблема без generics:
+
+  ```ts
+  function identity(value: any): any {
+    return value;
+  }
+
+  const result = identity('text');
+  result.toFixed(2); // TypeScript не ругается, но runtime упадет
+  ```
+
+  `any` стирает тип. TypeScript больше не знает, что `result` — строка.
+
+  Generic version:
+
   ```ts
   function identity<T>(value: T): T {
     return value;
@@ -67,6 +107,412 @@
 
   const result = identity('text'); // string
   ```
+
+  Здесь `T` — type parameter. TypeScript подставляет конкретный тип при вызове:
+
+  ```ts
+  const text = identity<string>('hello'); // string
+  const count = identity<number>(10); // number
+  const inferred = identity({ id: 1, title: 'Book' }); // { id: number; title: string }
+  ```
+
+  Обычно тип можно не указывать явно, TypeScript выведет его сам.
+
+  **Зачем нужны generics**
+
+  1. Сохранить связь между input и output:
+
+     ```ts
+     function first<T>(items: T[]): T | undefined {
+       return items[0];
+     }
+
+     const product = first([{ id: 'p1', title: 'Laptop' }]);
+     // product: { id: string; title: string } | undefined
+     ```
+
+  2. Писать reusable data structures:
+
+     ```ts
+     type ApiResponse<TData> = {
+       data: TData;
+       error: string | null;
+     };
+
+     type Product = {
+       id: string;
+       title: string;
+       price: number;
+     };
+
+     const response: ApiResponse<Product[]> = {
+       data: [{ id: 'p1', title: 'Laptop', price: 1200 }],
+       error: null,
+     };
+     ```
+
+  3. Типизировать async API:
+
+     ```ts
+     async function getJson<TResponse>(url: string): Promise<TResponse> {
+       const response = await fetch(url);
+       return response.json() as Promise<TResponse>;
+     }
+
+     const products = await getJson<Product[]>('/api/products');
+     ```
+
+     Здесь caller сам задает ожидаемый response type.
+
+  4. Ограничивать generic через constraints:
+
+     ```ts
+     function getById<TItem extends { id: string }>(
+       items: TItem[],
+       id: string
+     ): TItem | undefined {
+       return items.find((item) => item.id === id);
+     }
+
+     getById([{ id: 'p1', title: 'Laptop' }], 'p1');
+     ```
+
+     `extends { id: string }` говорит: generic может быть любым объектом, но обязан иметь `id`.
+
+  5. Типизировать ключи объекта:
+
+     ```ts
+     function getProperty<TObject, TKey extends keyof TObject>(
+       object: TObject,
+       key: TKey
+     ): TObject[TKey] {
+       return object[key];
+     }
+
+     const product = { id: 'p1', price: 1200 };
+
+     const price = getProperty(product, 'price'); // number
+     const id = getProperty(product, 'id'); // string
+     ```
+
+     Если написать `getProperty(product, 'unknown')`, TypeScript выдаст ошибку.
+
+  6. Создавать generic interfaces/classes:
+
+     ```ts
+     interface Repository<TEntity> {
+       findAll(): Promise<TEntity[]>;
+       findById(id: string): Promise<TEntity | null>;
+       save(entity: TEntity): Promise<TEntity>;
+     }
+
+     type User = {
+       id: string;
+       email: string;
+     };
+
+     const userRepository: Repository<User> = {
+       async findAll() {
+         return [{ id: 'u1', email: 'user@example.com' }];
+       },
+       async findById(id) {
+         return { id, email: 'user@example.com' };
+       },
+       async save(user) {
+         return user;
+       },
+     };
+     ```
+
+  7. Использовать default generic types:
+
+     ```ts
+     type PaginatedResult<TItem, TMeta = { total: number }> = {
+       items: TItem[];
+       meta: TMeta;
+     };
+
+     type ProductsPage = PaginatedResult<Product>;
+     ```
+
+  8. Типизировать React-like props:
+
+     ```ts
+     type SelectProps<TOption> = {
+       options: TOption[];
+       getLabel: (option: TOption) => string;
+       onChange: (option: TOption) => void;
+     };
+
+     function Select<TOption>({
+       options,
+       getLabel,
+       onChange,
+     }: SelectProps<TOption>) {
+       return (
+         <ul>
+           {options.map((option, index) => (
+             <li key={index}>
+               <button onClick={() => onChange(option)}>
+                 {getLabel(option)}
+               </button>
+             </li>
+           ))}
+         </ul>
+       );
+     }
+     ```
+
+     Использование:
+
+     ```tsx
+     <Select
+       options={[
+         { id: 'p1', title: 'Laptop' },
+         { id: 'p2', title: 'Phone' },
+       ]}
+       getLabel={(product) => product.title}
+       onChange={(product) => console.log(product.id)}
+     />
+     ```
+
+  **Mental model**
+
+  Generic — это "параметр для типа", как обычный параметр функции, только на уровне type system:
+
+  ```ts
+  function wrap<T>(value: T): { value: T } {
+    return { value };
+  }
+  ```
+
+  Если передали `string`, `T = string`. Если передали `Product`, `T = Product`. Так код остается reusable, но TypeScript не теряет точный тип данных.
+
+- What are utility types in TypeScript?
+
+  **Ответ:** Utility types, или сервисные типы, — это встроенные generic-типы TypeScript, которые преобразуют другие типы. Они помогают не дублировать DTO, view models, update payloads и function types вручную.
+
+  Например есть доменная модель:
+
+  ```ts
+  type Product = {
+    id: string;
+    title: string;
+    price: number;
+    description: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  ```
+
+  Из нее можно получить тип для создания товара:
+
+  ```ts
+  type CreateProductDto = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+  ```
+
+  И тип для частичного обновления:
+
+  ```ts
+  type UpdateProductDto = Partial<CreateProductDto>;
+  ```
+
+  Это лучше, чем руками поддерживать несколько почти одинаковых типов. Если в `Product` изменится поле `price`, связанные типы обновятся автоматически.
+
+- How do common TypeScript utility types work?
+
+  **Ответ:** Самые частые utility types:
+
+  - `Partial<T>` — делает все поля optional;
+  - `Required<T>` — делает все поля required;
+  - `Readonly<T>` — запрещает менять поля;
+  - `Pick<T, K>` — берет только выбранные поля;
+  - `Omit<T, K>` — исключает выбранные поля;
+  - `Record<K, T>` — создает object type с ключами `K` и значениями `T`;
+  - `Exclude<T, U>` — убирает из union варианты, совместимые с `U`;
+  - `Extract<T, U>` — оставляет из union варианты, совместимые с `U`;
+  - `NonNullable<T>` — убирает `null` и `undefined`;
+  - `ReturnType<T>` — получает тип возвращаемого значения функции;
+  - `Parameters<T>` — получает tuple аргументов функции;
+  - `Awaited<T>` — разворачивает тип Promise.
+
+  Примеры:
+
+  ```ts
+  type ProductPreview = Pick<Product, 'id' | 'title' | 'price'>;
+
+  type ProductPatch = Partial<
+    Pick<Product, 'title' | 'price' | 'description'>
+  >;
+
+  type ProductWithoutTimestamps = Omit<Product, 'createdAt' | 'updatedAt'>;
+  ```
+
+  `Record` удобно использовать для словарей:
+
+  ```ts
+  type Role = 'admin' | 'manager' | 'customer';
+
+  const permissions: Record<Role, string[]> = {
+    admin: ['products:create', 'products:delete'],
+    manager: ['products:create'],
+    customer: ['orders:create'],
+  };
+  ```
+
+  Utility types для функций:
+
+  ```ts
+  async function fetchProducts(categoryId: string, limit: number) {
+    return [{ id: 'p1', title: 'Laptop' }];
+  }
+
+  type FetchProductsArgs = Parameters<typeof fetchProducts>;
+  // [categoryId: string, limit: number]
+
+  type FetchProductsResult = Awaited<ReturnType<typeof fetchProducts>>;
+  // { id: string; title: string }[]
+  ```
+
+  Utility types для union:
+
+  ```ts
+  type Status = 'idle' | 'loading' | 'success' | 'error';
+
+  type FinishedStatus = Exclude<Status, 'idle' | 'loading'>;
+  // 'success' | 'error'
+
+  type ErrorOnly = Extract<Status, 'error' | 'failed'>;
+  // 'error'
+  ```
+
+  Практическое правило: utility types хороши, когда преобразование очевидно. Если тип становится слишком сложным, лучше дать ему понятное имя или описать отдельный interface/type.
+
+- What is the infer keyword in TypeScript?
+
+  **Ответ:** `infer` — ключевое слово для вывода части типа внутри conditional type. Оно позволяет сказать: "если тип подходит под такой шаблон, вытащи из него внутренний тип и назови его".
+
+  `infer` используется только в conditional types:
+
+  ```ts
+  type UnwrapPromise<T> = T extends Promise<infer TValue> ? TValue : T;
+  ```
+
+  Пример:
+
+  ```ts
+  type ProductPromise = Promise<Product>;
+
+  type ProductValue = UnwrapPromise<ProductPromise>;
+  // Product
+
+  type PlainValue = UnwrapPromise<string>;
+  // string
+  ```
+
+  Как это читать:
+
+  ```txt
+  Если T похож на Promise<что-то>,
+  вытащи это "что-то" и назови TValue.
+  Иначе верни T как есть.
+  ```
+
+  Пример для массива:
+
+  ```ts
+  type ArrayItem<T> = T extends Array<infer TItem> ? TItem : never;
+
+  type ProductItem = ArrayItem<Product[]>;
+  // Product
+  ```
+
+  Пример для функции:
+
+  ```ts
+  type MyReturnType<TFunction> =
+    TFunction extends (...args: never[]) => infer TResult
+      ? TResult
+      : never;
+
+  function createProduct() {
+    return { id: 'p1', title: 'Laptop' };
+  }
+
+  type CreatedProduct = MyReturnType<typeof createProduct>;
+  // { id: string; title: string }
+  ```
+
+  Многие встроенные utility types используют похожую идею. Например `ReturnType<T>` концептуально работает через `infer`, чтобы достать return type функции.
+
+- How does the is operator work in TypeScript?
+
+  **Ответ:** `is` в TypeScript используется в return type функции для создания custom type guard. Это не JavaScript runtime-оператор и не то же самое, что non-null assertion `!`. Функция реально возвращает boolean, а запись `value is SomeType` сообщает TypeScript: если функция вернула `true`, значение можно сузить до `SomeType`.
+
+  Пример:
+
+  ```ts
+  type Product = {
+    id: string;
+    title: string;
+    price: number;
+  };
+
+  function isProduct(value: unknown): value is Product {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    return (
+      'id' in value &&
+      'title' in value &&
+      'price' in value
+    );
+  }
+  ```
+
+  Использование:
+
+  ```ts
+  const value: unknown = await response.json();
+
+  if (isProduct(value)) {
+    console.log(value.title);
+    console.log(value.price.toFixed(2));
+  }
+  ```
+
+  Без `isProduct` TypeScript не даст безопасно обращаться к `value.title`, потому что `value` имеет тип `unknown`.
+
+  Type predicate особенно полезен для narrowing union types:
+
+  ```ts
+  type CardPayment = {
+    type: 'card';
+    cardNumber: string;
+  };
+
+  type PaypalPayment = {
+    type: 'paypal';
+    email: string;
+  };
+
+  type Payment = CardPayment | PaypalPayment;
+
+  function isCardPayment(payment: Payment): payment is CardPayment {
+    return payment.type === 'card';
+  }
+
+  function renderPayment(payment: Payment): string {
+    if (isCardPayment(payment)) {
+      return payment.cardNumber.slice(-4);
+    }
+
+    return payment.email;
+  }
+  ```
+
+  Важно: TypeScript доверяет type guard. Если функция написана неправильно и возвращает `true` для неподходящего значения, runtime все равно может упасть. Поэтому custom type guards должны реально проверять данные, особенно когда входной тип `unknown` пришел из API, localStorage или user input.
 
 - How do generic functions work?
 
